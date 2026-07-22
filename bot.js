@@ -11,7 +11,7 @@ if (!token) {
   process.exit(1);
 }
 
-// Initialize bot in polling mode
+// Initialize bot in polling modeA
 const bot = new TelegramBot(token, { polling: true });
 
 // 1. InMemory Store tracking language preferences { chatId: 'am' | 'en' }
