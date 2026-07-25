@@ -1,77 +1,84 @@
 import TelegramBot from 'node-telegram-bot-api';
 import dotenv from 'dotenv';
+import { createClient } from '@supabase/supabase-js';
 
 dotenv.config();
 
 const token = process.env.TELEGRAM_BOT_TOKEN;
 const webAppUrl = process.env.WEBAPP_URL;
+const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_KEY;
 
-if (!token) {
-  console.error("Error: TELEGRAM_BOT_TOKEN is missing in your environment variables.");
+if (!token || !supabaseUrl || !supabaseKey) {
+  console.error("Error: Missing Telegram Token or Supabase Credentials in .env");
   process.exit(1);
 }
 
-// Initialize bot in polling modeA
+// Initialize Supabase and Telegram Bot
+const supabase = createClient(supabaseUrl, supabaseKey);
 const bot = new TelegramBot(token, { polling: true });
 
-// 1. InMemory Store tracking language preferences { chatId: 'am' | 'en' }
+// InMemory Stores
 const userLanguages = {};
+const registrationState = {}; // Tracks if a user is currently typing their email
 
-// 2. Comprehensive Amharic and English Translation Dictionaries
+// Comprehensive Translation Dictionaries
 const botDict = {
   am: {
-    mainMenuText: `💳 *ℹ️ ስለ ብሉ ካርድ (BlueCards)*\n\nBlueCards የአካባቢ ገንዘብን ከዓለም አቀፍ ክፍያዎች ጋር ለማገናኘት የተነደፈ ዋና የፊንቴክ አገልግሎት ነው።\n\nፊዚካል የባንክ ካርዶችን የሚመስሉ ከፍተኛ ጥራት ያላቸውን የቪዛ እና የማስተርካርድ ቨርቹዋል ካርዶችን እናቀርባለን። በየትኛውም የዓለም ክፍሎች ክፍያዎችን በቀላሉ መፈጸም ይችላሉ።`,
-    aboutText: `ℹ️ *ስለ ብሉ ካርድ (BlueCards)*\n\nBlueCards የአካባቢ ገንዘብን ከዓለም አቀፍ ክፍያዎች ጋር ለማገናኘት የተነደፈ ዋና የፊንቴክ አገልግሎት ነው።\n\nፊዚካል የባንክ ካርዶችን የሚመስሉ ከፍተኛ ጥራት ያላቸውን የቪዛ እና የማስተርካርድ ቨርቹዋል ካርዶችን እናቀርባለን። ለኔትፍሊክስ፣ ለአማዞን ግብይት፣ ወይም ለፌስቡክ ማስታወቂያዎች ክፍያ እየፈጸሙ ይሁኑ፣ የእኛ ካርዶች ግብይትዎ በስኬት እንዲጠናቀቅ ያረጋግጣሉ።\n\n*ለምን መረጡን?*\n✅ *ተለዋዋጭ የገንዘብ ማስገቢያ:* የሚያስፈልጉዎትን ያህል ብቻ ይጫኑ።\n✅ *አስተማማኝ:* መረጃዎ በባንክ ደረጃ ደህንነቱ የተጠበቀ ነው።\n✅ *ፈጣን:* ክፍያ እንደፈጸሙ ካርዶች ወዲያውኑ ይወጣሉ።\n✅ *ወርሃዊ ክፍያ የሌለው:* ለተጠቀሙበት ብቻ ይክፈሉ፡፡`,
-    helpPortalText: `💡 *የብሉ ካርድ የእርዳታ እና ድጋፍ ፖርታል*\n\nየተቀማጭ ገንዘብ ማስገባት ችግር ካጋጠመዎት ወይም የማረጋገጫ እገዛ ከፈለጉ እባክዎን የድጋፍ መስመራችንን ያነጋግሩ።\n\nለመመለስ /start ይጠቀሙ።`,
+    mainMenuText: `💳 *ℹ️ ስለ ብሉ ካርድ (BlueCards)*\n\nBlueCards የአካባቢ ገንዘብን ከዓለም አቀፍ ክፍያዎች ጋር ለማገናኘት የተነደፈ ዋና የፊንቴክ አገልግሎት ነው።`,
+    aboutText: `ℹ️ *ስለ ብሉ ካርድ (BlueCards)*\n\nBlueCards የአካባቢ ገንዘብን ከዓለም አቀፍ ክፍያዎች ጋር ለማገናኘት የተነደፈ ዋና የፊንቴክ አገልግሎት ነው።\n\n*ለምን መረጡን?*\n✅ *ተለዋዋጭ የገንዘብ ማስገቢያ:* የሚያስፈልጉዎትን ያህል ብቻ ይጫኑ።\n✅ *አስተማማኝ:* መረጃዎ በባንክ ደረጃ ደህንነቱ የተጠበቀ ነው።`,
+    helpPortalText: `💡 *የብሉ ካርድ የእርዳታ እና ድጋፍ ፖርታል*\n\nየተቀማጭ ገንዘብ ማስገባት ችግር ካጋጠመዎት እባክዎን ያነጋግሩን።`,
     webappText: `ደህንነቱ የተጠበቀ ገጽዎን ለመክፈት ከታች ያለውን ቁልፍ ይጫኑ፡`,
     launchBtn: "🚀 አፕ ክፈት / Launch App",
     aboutBtn: "ℹ️ ስለ ብሉ ካርድ",
     supportBtn: "❓ እርዳታና ድጋፍ",
     langToggleBtn: "🌐 ቋንቋ ቀይር / Change Language",
+    registerBtn: "📝 መመዝገቢያ / Register",
     backBtn: "⬅️ ወደ ዋና ማውጫ",
-    chooseLang: "እባክዎ የሚመርጡትን ቋንቋ ይምረጡ / Please select your preferred language:",
-    langUpdated: "ቋንቋዎ በተሳካ ሁኔታ ወደ አማርኛ ተቀይሯል! 🇪🇹"
+    chooseLang: "እባክዎ የሚመርጡትን ቋንቋ ይምረጡ:",
+    langUpdated: "ቋንቋዎ በተሳካ ሁኔታ ወደ አማርኛ ተቀይሯል! 🇪🇹",
+    askEmail: "እባክዎ መረጃዎችን እና አዳዲስ ማሳወቂያዎችን ለማግኘት የኢሜል አድራሻዎን ይጻፉልን (ለምሳሌ፡ name@gmail.com) 📧",
+    invalidEmail: "❌ ያስገቡት ኢሜል ትክክል አይደለም። እባክዎ እንደገና ይሞክሩ።",
+    registerSuccess: "✅ ምዝገባዎ በተሳካ ሁኔታ ተጠናቋል! እናመሰግናለን!"
   },
   en: {
-    mainMenuText: `💳 *ℹ️ About BlueCards*\n\nBlueCards is a premium fintech service designed to bridge the gap between local currency and global payments.\n\nWe provide high-quality virtual Visa and Mastercards that work exactly like physical bank cards. Whether you're paying for Netflix, shopping on Amazon, or running Facebook Ads, our cards ensure your transaction goes through.`,
-    aboutText: `ℹ️ *About BlueCards*\n\nBlueCards is a premium fintech service designed to bridge the gap between local currency and global payments.\n\nWe provide high-quality virtual Visa and Mastercards that work exactly like physical bank cards. Whether you're paying for Netflix, shopping on Amazon, or running Facebook Ads, our cards ensure your transaction goes through.\n\n*Why Choose Us?*\n✅ *Flexible Funding:* Load exactly what you need.\n✅ *Secure:* Your data is protected with bank-grade security.\n✅ *Fast:* Cards are issued instantly upon payment.\n✅ *No Monthly Fees:* Pay only for what you use.`,
-    helpPortalText: `💡 *BlueCards Help Support Portal*\n\nIf you encounter deposit processing issues or need verification approval assistance, please contact our automated support channels.\n\nUse /start to go back.`,
+    mainMenuText: `💳 *ℹ️ About BlueCards*\n\nBlueCards is a premium fintech service designed to bridge the gap between local currency and global payments.`,
+    aboutText: `ℹ️ *About BlueCards*\n\nBlueCards is a premium fintech service designed to bridge the gap between local currency and global payments.\n\n*Why Choose Us?*\n✅ *Flexible Funding:* Load exactly what you need.\n✅ *Secure:* Your data is protected with bank-grade security.`,
+    helpPortalText: `💡 *BlueCards Help Support Portal*\n\nIf you encounter deposit processing issues, contact our support channels.`,
     webappText: `Click below to execute your secure standalone portal framework session:`,
     launchBtn: "🚀 Launch App",
     aboutBtn: "ℹ️ About BlueCards",
     supportBtn: "❓ Support Help",
     langToggleBtn: "🌐 Change Language",
+    registerBtn: "📝 Register for Updates",
     backBtn: "⬅️ Back to Menu",
-    chooseLang: "Please select your preferred language / እባክዎ የሚመርጡትን ቋንቋ ይምረጡ:",
-    langUpdated: "Your language profile has been successfully set to English! 🇬🇧"
+    chooseLang: "Please select your preferred language:",
+    langUpdated: "Your language profile has been successfully set to English! 🇬🇧",
+    askEmail: "Please type and send your email address to receive important account updates (e.g., name@gmail.com) 📧",
+    invalidEmail: "❌ Invalid email format. Please try again.",
+    registerSuccess: "✅ Registration complete! Thank you for joining us!"
   }
 };
 
-// 3. Dynamic localization helper function
 const t = (chatId, key) => {
-  const currentLang = userLanguages[chatId] || 'am'; // Defaults directly to Amharic
+  const currentLang = userLanguages[chatId] || 'am';
   return botDict[currentLang][key] || botDict['am'][key] || key;
 };
 
-/**
- * Configure the native chat command menu dropdown 
- */
 bot.setMyCommands([
   { command: 'start', description: '🚀 Open BlueCards Mini App' },
   { command: 'help', description: '❓ Get help' },
   { command: 'webapp', description: '🌐 Launch mini webapp' }
-]).then(() => {
-  console.log("✅ Bot commands menu successfully registered with Telegram API.");
-});
+]);
 
-/**
- * Menu Layout Configurations (Localized dynamically using chatId)
- */
 const getMainMenuKeyboard = (chatId) => ({
   reply_markup: {
     inline_keyboard: [
       [
         { text: t(chatId, 'launchBtn'), web_app: { url: webAppUrl } }
+      ],
+      [
+        { text: t(chatId, 'registerBtn'), callback_data: "trigger_register" }
       ],
       [
         { text: t(chatId, 'aboutBtn'), callback_data: "view_about" },
@@ -87,17 +94,11 @@ const getMainMenuKeyboard = (chatId) => ({
 const getAboutKeyboard = (chatId) => ({
   parse_mode: 'Markdown',
   reply_markup: {
-    inline_keyboard: [
-      [
-        { text: t(chatId, 'backBtn'), callback_data: "back_to_menu" }
-      ]
-    ]
+    inline_keyboard: [[{ text: t(chatId, 'backBtn'), callback_data: "back_to_menu" }]]
   }
 });
 
-/**
- * Command Controllers
- */
+// Command Controllers
 bot.onText(/\/start/, (msg) => {
   const chatId = msg.chat.id;
   bot.sendMessage(chatId, t(chatId, 'mainMenuText'), {
@@ -106,58 +107,68 @@ bot.onText(/\/start/, (msg) => {
   });
 });
 
-bot.onText(/\/webapp/, (msg) => {
+// Email Listener (Catches text input when state is 'awaiting_email')
+bot.on('message', async (msg) => {
   const chatId = msg.chat.id;
-  bot.sendMessage(chatId, t(chatId, 'webappText'), {
-    reply_markup: {
-      inline_keyboard: [
-        [{ text: t(chatId, 'launchBtn'), web_app: { url: webAppUrl } }]
-      ]
+  const text = msg.text;
+
+  // Ignore commands
+  if (!text || text.startsWith('/')) return;
+
+  if (registrationState[chatId] === 'awaiting_email') {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    
+    if (!emailRegex.test(text)) {
+      bot.sendMessage(chatId, t(chatId, 'invalidEmail'));
+      return;
     }
-  });
+
+    try {
+      // Upsert user into Supabase 'users' table
+      const { error } = await supabase
+        .from('users')
+        .upsert({
+          chat_id: chatId.toString(),
+          username: msg.chat.username || 'No Username',
+          first_name: msg.chat.first_name || 'No Name',
+          email: text,
+          updated_at: new Date().toISOString()
+        }, { onConflict: 'chat_id' }); // Prevents duplicate entries for the same Telegram account
+
+      if (error) throw error;
+
+      bot.sendMessage(chatId, t(chatId, 'registerSuccess'));
+      delete registrationState[chatId]; // Clear their typing state
+
+    } catch (err) {
+      console.error("Supabase Error:", err);
+      bot.sendMessage(chatId, "⚠️ Database connection error. Please try again later.");
+    }
+  }
 });
 
-bot.onText(/\/help/, (msg) => {
-  const chatId = msg.chat.id;
-  bot.sendMessage(chatId, t(chatId, 'helpPortalText'), { parse_mode: 'Markdown' });
-});
-
-/**
- * Inline Callback Query Routing Router 
- */
+// Callback Query Router
 bot.on('callback_query', (query) => {
   const chatId = query.message.chat.id;
   const messageId = query.message.message_id;
   const data = query.data;
 
   if (data === "view_about") {
-    bot.editMessageText(t(chatId, 'aboutText'), {
-      chat_id: chatId,
-      message_id: messageId,
-      parse_mode: 'Markdown',
-      ...getAboutKeyboard(chatId)
-    });
+    bot.editMessageText(t(chatId, 'aboutText'), { chat_id: chatId, messageId, parse_mode: 'Markdown', ...getAboutKeyboard(chatId) });
   } 
   else if (data === "back_to_menu") {
-    bot.editMessageText(t(chatId, 'mainMenuText'), {
-      chat_id: chatId,
-      message_id: messageId,
-      parse_mode: 'Markdown',
-      ...getMainMenuKeyboard(chatId)
-    });
+    bot.editMessageText(t(chatId, 'mainMenuText'), { chat_id: chatId, messageId, parse_mode: 'Markdown', ...getMainMenuKeyboard(chatId) });
   }
   else if (data === "view_help") {
-    bot.editMessageText(t(chatId, 'helpPortalText'), {
-      chat_id: chatId,
-      message_id: messageId,
-      parse_mode: 'Markdown',
-      ...getAboutKeyboard(chatId) // Standard single return interface link
-    });
+    bot.editMessageText(t(chatId, 'helpPortalText'), { chat_id: chatId, messageId, parse_mode: 'Markdown', ...getAboutKeyboard(chatId) });
+  }
+  else if (data === "trigger_register") {
+    registrationState[chatId] = 'awaiting_email'; // Activate listener
+    bot.sendMessage(chatId, t(chatId, 'askEmail'));
   }
   else if (data === "trigger_language_select") {
     bot.editMessageText(t(chatId, 'chooseLang'), {
-      chat_id: chatId,
-      message_id: messageId,
+      chat_id: chatId, messageId,
       reply_markup: {
         inline_keyboard: [
           [{ text: "🇪🇹 አማርኛ (Amharic)", callback_data: "assign_lang_am" }],
@@ -168,28 +179,13 @@ bot.on('callback_query', (query) => {
     });
   }
   else if (data === "assign_lang_am" || data === "assign_lang_en") {
-    const designatedLanguage = data === "assign_lang_am" ? 'am' : 'en';
-    
-    // Save language update inside preference configuration profile
-    userLanguages[chatId] = designatedLanguage;
-
-    // Send confirmation and render out the newly translated home menu
-    bot.editMessageText(t(chatId, 'langUpdated'), {
-      chat_id: chatId,
-      message_id: messageId,
-    }).then(() => {
-      // Small timeout buffer lets the user read validation completion toast before menu shifts back
+    userLanguages[chatId] = data === "assign_lang_am" ? 'am' : 'en';
+    bot.editMessageText(t(chatId, 'langUpdated'), { chat_id: chatId, messageId }).then(() => {
       setTimeout(() => {
-        bot.sendMessage(chatId, t(chatId, 'mainMenuText'), {
-          parse_mode: 'Markdown',
-          ...getMainMenuKeyboard(chatId)
-        });
+        bot.sendMessage(chatId, t(chatId, 'mainMenuText'), { parse_mode: 'Markdown', ...getMainMenuKeyboard(chatId) });
       }, 1200);
     });
   }
 
-  // Acknowledge the callback internally to remove the button loading spinner state
   bot.answerCallbackQuery(query.id);
 });
-
-console.log("🚀 BlueCards Backend Gateway Listener Initialized Successfully.");
