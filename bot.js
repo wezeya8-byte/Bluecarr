@@ -20,12 +20,11 @@ const bot = new TelegramBot(token, { polling: true });
 
 // InMemory Stores
 const userLanguages = {};
-const registrationState = {}; // Tracks if a user is currently typing their email
 
 // Comprehensive Translation Dictionaries
 const botDict = {
   am: {
-    mainMenuText: `💳 *ℹ️ ስለ ብሉ ካርድ (BlueCards)*\n\nBlueCards የአካባቢ ገንዘብን ከዓለም አቀፍ ክፍያዎች ጋር ለማገናኘት የተነደፈ ዋና የፊንቴክ አገልግሎት ነው።\n\nፊዚካል የባንክ ካርዶችን የሚመስሉ ከፍተኛ ጥራት ያላቸውን የቪዛ እና የማስተርካርድ ቨርቹዋል ካርዶችን እናቀርባለን። በየትኛውም የዓለም ክፍሎች ክፍያዎችን በቀላሉ መፈጸም ይችላሉ።`,
+    mainMenuText: `💳 *ℹ️ ስለ ብሉ ካርድ (BlueCards)*\n\nBlueCards የአካባቢ ገንዘብን ከዓለም አቀፍ ክፍያዎች ጋር ለማገናኘት የተነደፈ ዋና የፊንቴክ አገልግሎት ነው።\n\nፊዚካል የባንክ ካርዶችን የሚመስሉ ከፍተኛ ጥራት ያላቸውን የቪዛ እና የማስተርካርድ ቨርቹዋል ካርዶችን እናቀርባለን።`,
     aboutText: `ℹ️ *ስለ ብሉ ካርድ (BlueCards)*\n\nBlueCards የአካባቢ ገንዘብን ከዓለም አቀፍ ክፍያዎች ጋር ለማገናኘት የተነደፈ ዋና የፊንቴክ አገልግሎት ነው።\n\n*ለምን መረጡን?*\n✅ *ተለዋዋጭ የገንዘብ ማስገቢያ:* የሚያስፈልጉዎትን ያህል ብቻ ይጫኑ።\n✅ *አስተማማኝ:* መረጃዎ በባንክ ደረጃ ደህንነቱ የተጠበቀ ነው።`,
     helpPortalText: `💡 *የብሉ ካርድ የእርዳታ እና ድጋፍ ፖርታል*\n\nየተቀማጭ ገንዘብ ማስገባት ችግር ካጋጠመዎት እባክዎን ያነጋግሩን።`,
     webappText: `ደህንነቱ የተጠበቀ ገጽዎን ለመክፈት ከታች ያለውን ቁልፍ ይጫኑ፡`,
@@ -37,8 +36,8 @@ const botDict = {
     backBtn: "⬅️ ወደ ዋና ማውጫ",
     chooseLang: "እባክዎ የሚመርጡትን ቋንቋ ይምረጡ:",
     langUpdated: "ቋንቋዎ በተሳካ ሁኔታ ወደ አማርኛ ተቀይሯል! 🇪🇹",
-    askEmail: "እባክዎ መረጃዎችን እና አዳዲስ ማሳወቂያዎችን ለማግኘት የኢሜል አድራሻዎን ይጻፉልን (ለምሳሌ፡ name@gmail.com) 📧",
-    invalidEmail: "❌ ያስገቡት ኢሜል ትክክል አይደለም። እባክዎ እንደገና ይሞክሩ።",
+    shareContactPrompt: "እባክዎ ለመመዝገብ ከታች ያለውን 'ስልክ ቁጥር አጋራ' የሚለውን ቁልፍ ይጫኑ 📱",
+    shareContactBtn: "📱 ስልክ ቁጥር አጋራ / Share Contact",
     registerSuccess: "✅ ምዝገባዎ በተሳካ ሁኔታ ተጠናቋል! እናመሰግናለን!"
   },
   en: {
@@ -54,8 +53,8 @@ const botDict = {
     backBtn: "⬅️ Back to Menu",
     chooseLang: "Please select your preferred language:",
     langUpdated: "Your language profile has been successfully set to English! 🇬🇧",
-    askEmail: "Please type and send your email address to receive important account updates (e.g., name@gmail.com) 📧",
-    invalidEmail: "❌ Invalid email format. Please try again.",
+    shareContactPrompt: "Please click the 'Share Contact' button at the bottom of your screen to register 📱",
+    shareContactBtn: "📱 Share Contact",
     registerSuccess: "✅ Registration complete! Thank you for joining us!"
   }
 };
@@ -70,11 +69,9 @@ bot.setMyCommands([
   { command: 'start', description: '🚀 Open BlueCards Mini App' },
   { command: 'help', description: '❓ Get help' },
   { command: 'webapp', description: '🌐 Launch mini webapp' }
-]).then(() => {
-  console.log("✅ Bot commands menu successfully registered with Telegram API.");
-});
+]);
 
-// Main Menu Layout Configuration (Includes the Register Button)
+// Main Menu Layout Configuration (Includes Inline Register Button)
 const getMainMenuKeyboard = (chatId) => ({
   reply_markup: {
     inline_keyboard: [
@@ -111,59 +108,44 @@ bot.onText(/\/start/, (msg) => {
   });
 });
 
-bot.onText(/\/webapp/, (msg) => {
-  const chatId = msg.chat.id;
-  bot.sendMessage(chatId, t(chatId, 'webappText'), {
-    reply_markup: {
-      inline_keyboard: [
-        [{ text: t(chatId, 'launchBtn'), web_app: { url: webAppUrl } }]
-      ]
-    }
-  });
-});
-
 bot.onText(/\/help/, (msg) => {
   const chatId = msg.chat.id;
   bot.sendMessage(chatId, t(chatId, 'helpPortalText'), { parse_mode: 'Markdown' });
 });
 
-// Email Listener (Catches text input when state is 'awaiting_email')
-bot.on('message', async (msg) => {
+// Contact Listener (Catches the phone number when they press Share Contact)
+bot.on('contact', async (msg) => {
   const chatId = msg.chat.id;
-  const text = msg.text;
+  const contact = msg.contact;
 
-  // Ignore commands
-  if (!text || text.startsWith('/')) return;
+  try {
+    // Upsert user into Supabase 'users' table using their phone number
+    const { error } = await supabase
+      .from('users')
+      .upsert({
+        chat_id: chatId.toString(),
+        username: msg.chat.username || 'No Username',
+        first_name: msg.chat.first_name || 'No Name',
+        phone: contact.phone_number,
+        updated_at: new Date().toISOString()
+      }, { onConflict: 'chat_id' });
 
-  if (registrationState[chatId] === 'awaiting_email') {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    
-    if (!emailRegex.test(text)) {
-      bot.sendMessage(chatId, t(chatId, 'invalidEmail'));
-      return;
-    }
+    if (error) throw error;
 
-    try {
-      // Upsert user into Supabase 'users' table
-      const { error } = await supabase
-        .from('users')
-        .upsert({
-          chat_id: chatId.toString(),
-          username: msg.chat.username || 'No Username',
-          first_name: msg.chat.first_name || 'No Name',
-          email: text,
-          updated_at: new Date().toISOString()
-        }, { onConflict: 'chat_id' });
+    // Remove the contact keyboard and send success message
+    bot.sendMessage(chatId, t(chatId, 'registerSuccess'), {
+      reply_markup: { remove_keyboard: true }
+    }).then(() => {
+      // Bring back the main inline menu
+      bot.sendMessage(chatId, t(chatId, 'mainMenuText'), {
+        parse_mode: 'Markdown',
+        ...getMainMenuKeyboard(chatId)
+      });
+    });
 
-      if (error) throw error;
-
-      bot.sendMessage(chatId, t(chatId, 'registerSuccess'));
-      delete registrationState[chatId]; // Clear their typing state
-
-    } catch (err) {
-      console.error("Supabase Error:", err);
-      bot.sendMessage(chatId, "⚠️ Database connection error. Please try again later.");
-    }
+  } catch (err) {
+    console.error("Supabase Error:", err);
+    bot.sendMessage(chatId, "⚠️ Database connection error. Please try again later.");
   }
 });
 
@@ -183,8 +165,16 @@ bot.on('callback_query', (query) => {
     bot.editMessageText(t(chatId, 'helpPortalText'), { chat_id: chatId, message_id: messageId, parse_mode: 'Markdown', ...getAboutKeyboard(chatId) });
   }
   else if (data === "trigger_register") {
-    registrationState[chatId] = 'awaiting_email'; // Activate listener
-    bot.sendMessage(chatId, t(chatId, 'askEmail'));
+    // Open the native Telegram Contact Request Keyboard
+    bot.sendMessage(chatId, t(chatId, 'shareContactPrompt'), {
+      reply_markup: {
+        keyboard: [
+          [{ text: t(chatId, 'shareContactBtn'), request_contact: true }]
+        ],
+        resize_keyboard: true,
+        one_time_keyboard: true
+      }
+    });
   }
   else if (data === "trigger_language_select") {
     bot.editMessageText(t(chatId, 'chooseLang'), {
